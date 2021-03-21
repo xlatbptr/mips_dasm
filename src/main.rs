@@ -71,6 +71,10 @@ fn main() -> Result<(),Box<dyn Error>> {
 	let mut buffer = Vec::<u8>::new();
 	f.read_to_end(&mut buffer)?;
 
+	if read_size == 0 {
+		read_size = buffer.len() - file_offset;
+	}
+
 	// Collect file's bytes and apck them to the encoding buffer
 	println!("Recollecting encoded instructions");
 	let mut enc = Vec::<Encoded>::new();
