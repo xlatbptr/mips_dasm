@@ -34,10 +34,10 @@ pub fn obtain_label(ins: &Encoded, pc: u64) -> Option<Label> {
 		}
 		// Lui is also used commonly for labels and stuff
 		Type::Immediate => {
-			let funct = ins.get_funct();
+			let opcode = ins.get_opcode();
 			let abs = ins.get_absolute(pc);
-			return match funct {
-				0x0F => Some(Label::new(format!("data_{:X}",abs),abs)),
+			return match opcode {
+				0x09 | 0x0F => Some(Label::new(format!("data_{:X}",abs),abs)),
 				_ => None,
 			}
 		}

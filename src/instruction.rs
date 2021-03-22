@@ -141,7 +141,7 @@ impl Encoded {
 					_ => Type::Invalid,
 				}
 			}
-			0x10 | 0x20..=0x26 | 0x28..=0x2B | 0x30..=0x31 | 0x38 => Type::Immediate,
+			0x08..=0x10 | 0x20..=0x26 | 0x28..=0x2B | 0x30..=0x31 | 0x38 => Type::Immediate,
 			_ => Type::Invalid,
 		}
 	}
@@ -296,13 +296,33 @@ pub fn synthetize(enc: &Vec::<Encoded>, labels: &Vec::<Label>, vram: u64, i: *mu
 					}
 				}
 				0x08 => format!("addi ${}, ${}, {}",R_NAME[rd],R_NAME[rs],imm),
-				0x09 => format!("addiu ${}, ${}, {}",R_NAME[rd],R_NAME[rs],imm),
+				0x09 => {
+					let abs = ins.get_absolute(pc);
+					let opt_label = labels.iter().find(|&a| a.target == abs);
+					let label_ref: String;
+					if opt_label.is_some() {
+						label_ref = opt_label.unwrap().name.clone();
+					} else {
+						label_ref = format!("{}",imm);
+					}
+					format!("addiu ${}, ${}, {}",R_NAME[rd],R_NAME[rs],label_ref)
+				}
 				0x0A => format!("slti ${}, ${}, {}",R_NAME[rd],R_NAME[rt],imm),
 				0x0B => format!("sltiu ${}, ${}, {}",R_NAME[rd],R_NAME[rt],imm),
 				0x0C => format!("andi ${}, ${}, {}",R_NAME[rd],R_NAME[rs],imm),
 				0x0D => format!("ori ${}, ${}, {}",R_NAME[rd],R_NAME[rs],imm),
 				0x0E => format!("xori ${}, ${}, {}",R_NAME[rd],R_NAME[rs],imm),
-				0x0F => format!("lui ${}, {}",R_NAME[rt],imm),
+				0x0F => {
+					let abs = ins.get_absolute(pc);
+					let opt_label = labels.iter().find(|&a| a.target == abs);
+					let label_ref: String;
+					if opt_label.is_some() {
+						label_ref = opt_label.unwrap().name.clone();
+					} else {
+						label_ref = format!("{}",imm);
+					}
+					format!("lui ${}, {}",R_NAME[rt],label_ref)
+				}
 				0x10 => {
 					// TODO: This is a horrible way of doing it
 					if funct == 0x18 {
