@@ -1,4 +1,4 @@
-MIPS DASM is a very simple MIPS disassembler. There is currently no support for float opcodes.
+MIPS DASM is a very simple MIPS disassembler.
 
 === Passing options
 All options with integers must be in decimal.

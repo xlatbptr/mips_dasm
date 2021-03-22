@@ -144,15 +144,41 @@ pub fn obtain_label(ins: &Encoded, pc: u64) -> Option<Label> {
 	}
 }
 
+static REGISTER_NAMES: [&str;32] = [
+	"zero",
+	"at",
+	"v0","v1",
+	"a0","a1","a2","a3",
+	"t0","t1","t2","t3","t4","t5","t6","t7",
+	"s0","s1","s2","s3","s4","s5","s6","s7",
+	"t8","t9",
+	"k0","k1",
+	"gp",
+	"sp",
+	"fp",
+	"ra"
+];
+
+pub fn dword_data(ins: &Encoded, labels: &Vec::<Label>) -> String {
+	// Pointing to a label, this simplifies everything
+	let opt_label = labels.iter().find(|&a| a.target == ins.raw_dword as u64);
+	let label_ref: String;
+	if opt_label.is_some() {
+		label_ref = opt_label.unwrap().name.clone();
+		return format!("dd {}",label_ref);
+	}
+	format!("dd 0x{:X}",ins.raw_dword)
+}
+
 pub fn synthetize(enc: &Vec::<Encoded>, labels: &Vec::<Label>, vram: u64, i: *mut usize) -> String {
 	let idx = unsafe { i.read_volatile() };
 	let ins = &enc[idx];
 	let pc = ((idx * size_of::<u32>()) as u64) + vram;
 
 	let funct = ins.get_funct();
-	let rd = ins.get_rd();
-	let rt = ins.get_rt();
-	let rs = ins.get_rs();
+	let rd = ins.get_rd() as usize;
+	let rt = ins.get_rt() as usize;
+	let rs = ins.get_rs() as usize;
 	let shift = ins.get_shift();
 	let cc = ins.get_coproc();
 	match ins.get_type() {
@@ -170,54 +196,54 @@ pub fn synthetize(enc: &Vec::<Encoded>, labels: &Vec::<Label>, vram: u64, i: *mu
 					if rd == 0 && rt == 0 && shift == 0 {
 						return format!("nop");
 					} else {
-						return format!("sll ${}, ${}, {}",rd,rt,shift);
+						return format!("sll ${}, ${}, {}",REGISTER_NAMES[rd],REGISTER_NAMES[rt],shift);
 					}
 				}
 				0x01 => {
 					let t = ins.get_coproc_movx();
 
 					if t == 0 {
-						return format!("movf ${}, ${}, {}",rd,rs,cc);
+						return format!("movf ${}, ${}, {}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],cc);
 					} else {
-						return format!("movt ${}, ${}, {}",rd,rs,cc);
+						return format!("movt ${}, ${}, {}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],cc);
 					}
 				}
 
-				0x02 => format!("srl ${}, ${}, {}",rd,rt,shift),
-				0x03 => format!("sra ${}, ${}, {}",rd,rt,shift),
-				0x04 => format!("sllv ${}, ${}, ${}",rd,rt,rs),
-				0x06 => format!("srlv ${}, ${}, ${}",rd,rt,rs),
-				0x07 => format!("srav ${}, ${}, ${}",rd,rt,rs),
-				0x08 => format!("jr ${}",rs),
-				0x09 => format!("jalr ${}, ${}",rs,rd),
-				0x0A => format!("movz ${}, ${}, ${}",rd,rs,rt),
-				0x0B => format!("movn ${}, ${}, ${}",rd,rs,rt),
-				0x10 => format!("mfhi ${}",rs),
-				0x11 => format!("mthi ${}",rs),
-				0x12 => format!("mflo ${}",rd),
-				0x13 => format!("mtlo ${}",rd),
-				0x18 => format!("mult ${}, ${}",rs,rt),
-				0x19 => format!("multu ${}, ${}",rs,rt),
-				0x1A => format!("div ${}, ${}",rs,rt),
-				0x1B => format!("divu ${}, ${}",rs,rt),
-				0x20 => format!("add ${}, ${}, ${}",rd,rs,rt),
-				0x21 => format!("addu ${}, ${}, ${}",rd,rs,rt),
-				0x22 => format!("sub ${}, ${}, ${}",rd,rs,rt),
-				0x23 => format!("subu ${}, ${}, ${}",rd,rs,rt),
-				0x24 => format!("and ${}, ${}, ${}",rd,rs,rt),
-				0x25 => format!("or ${}, ${}, ${}",rd,rs,rt),
-				0x26 => format!("xor ${}, ${}, ${}",rd,rs,rt),
-				0x27 => format!("nor ${}, ${}, ${}",rd,rs,rt),
-				0x2A => format!("slt ${}, ${}, ${}",rd,rs,rt),
-				0x2B => format!("sltu ${}, ${}, ${}",rd,rs,rt),
-				0x30 => format!("tge ${}, ${}",rs,rt),
-				0x31 => format!("tgeu ${}, ${}",rs,rt),
-				0x32 => format!("tlt ${}, ${}",rs,rt),
-				0x33 =>	format!("tltu ${}, ${}",rs,rt),
-				0x34 => format!("teq ${}, ${}",rs,rt),
-				0x36 => format!("tneq ${}, ${}",rs,rt),
+				0x02 => format!("srl ${}, ${}, {}",REGISTER_NAMES[rd],REGISTER_NAMES[rt],shift),
+				0x03 => format!("sra ${}, ${}, {}",REGISTER_NAMES[rd],REGISTER_NAMES[rt],shift),
+				0x04 => format!("sllv ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rt],REGISTER_NAMES[rs]),
+				0x06 => format!("srlv ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rt],REGISTER_NAMES[rs]),
+				0x07 => format!("srav ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rt],REGISTER_NAMES[rs]),
+				0x08 => format!("jr ${}",REGISTER_NAMES[rs]),
+				0x09 => format!("jalr ${}, ${}",REGISTER_NAMES[rs],REGISTER_NAMES[rd]),
+				0x0A => format!("movz ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x0B => format!("movn ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x10 => format!("mfhi ${}",REGISTER_NAMES[rs]),
+				0x11 => format!("mthi ${}",REGISTER_NAMES[rs]),
+				0x12 => format!("mflo ${}",REGISTER_NAMES[rd]),
+				0x13 => format!("mtlo ${}",REGISTER_NAMES[rd]),
+				0x18 => format!("mult ${}, ${}",REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x19 => format!("multu ${}, ${}",REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x1A => format!("div ${}, ${}",REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x1B => format!("divu ${}, ${}",REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x20 => format!("add ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x21 => format!("addu ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x22 => format!("sub ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x23 => format!("subu ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x24 => format!("and ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x25 => format!("or ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x26 => format!("xor ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x27 => format!("nor ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x2A => format!("slt ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x2B => format!("sltu ${}, ${}, ${}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x30 => format!("tge ${}, ${}",REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x31 => format!("tgeu ${}, ${}",REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x32 => format!("tlt ${}, ${}",REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x33 =>	format!("tltu ${}, ${}",REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x34 => format!("teq ${}, ${}",REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
+				0x36 => format!("tneq ${}, ${}",REGISTER_NAMES[rs],REGISTER_NAMES[rt]),
 				_ => {
-					format!("dd 0x{:X}",ins.raw_dword)
+					dword_data(ins,labels)
 				}
 			}
 		}
@@ -236,42 +262,40 @@ pub fn synthetize(enc: &Vec::<Encoded>, labels: &Vec::<Label>, vram: u64, i: *mu
 			match opcode {
 				0x01 => {
 					match rt {
-						0x00 => format!("bltz ${}, {}",rs,label_ref),
-						0x01 => format!("bgez ${}, {}",rs,label_ref),
-						0x08 => format!("tgei ${}, {}",rs,imm),
-						0x09 => format!("tgeiu ${}, {}",rs,imm),
-						0x0A => format!("tlti ${}, {}",rs,imm),
-						0x0B => format!("tltiu ${}, {}",rs,imm),
-						0x0C => format!("teqi ${}, {}",rs,imm),
-						0x0E => format!("tneqi ${}, {}",rs,imm),
-						0x10 => format!("bltzal ${}, {}",rs,label_ref),
-						0x11 => format!("bgezal ${}, {}",rs,label_ref),
-						_ => {
-							format!("dd 0x{:X}",ins.raw_dword)
-						}
+						0x00 => format!("bltz ${}, {}",REGISTER_NAMES[rs],label_ref),
+						0x01 => format!("bgez ${}, {}",REGISTER_NAMES[rs],label_ref),
+						0x08 => format!("tgei ${}, {}",REGISTER_NAMES[rs],imm),
+						0x09 => format!("tgeiu ${}, {}",REGISTER_NAMES[rs],imm),
+						0x0A => format!("tlti ${}, {}",REGISTER_NAMES[rs],imm),
+						0x0B => format!("tltiu ${}, {}",REGISTER_NAMES[rs],imm),
+						0x0C => format!("teqi ${}, {}",REGISTER_NAMES[rs],imm),
+						0x0E => format!("tneqi ${}, {}",REGISTER_NAMES[rs],imm),
+						0x10 => format!("bltzal ${}, {}",REGISTER_NAMES[rs],label_ref),
+						0x11 => format!("bgezal ${}, {}",REGISTER_NAMES[rs],label_ref),
+						_ => dword_data(ins,labels),
 					}
 				}
-				0x04 => format!("beq ${}, ${}, {}",rs,rt,label_ref),
-				0x05 => format!("bne ${}, ${}, {}",rs,rt,label_ref),
-				0x06 => format!("blez ${}, {}",rs,label_ref),
-				0x07 => format!("bgtz ${}, {}",rs,label_ref),
-				0x08 => format!("addi ${}, ${}, {}",rd,rs,imm),
-				0x09 => format!("addiu ${}, ${}, {}",rd,rs,imm),
-				0x0A => format!("slti ${}, ${}, {}",rd,rt,imm),
-				0x0B => format!("sltiu ${}, ${}, {}",rd,rt,imm),
-				0x0C => format!("andi ${}, ${}, {}",rd,rs,imm),
-				0x0D => format!("ori ${}, ${}, {}",rd,rs,imm),
-				0x0E => format!("xori ${}, ${}, {}",rd,rs,imm),
-				0x0F => format!("lui ${}, {}",rt,imm),
+				0x04 => format!("beq ${}, ${}, {}",REGISTER_NAMES[rs],REGISTER_NAMES[rt],label_ref),
+				0x05 => format!("bne ${}, ${}, {}",REGISTER_NAMES[rs],REGISTER_NAMES[rt],label_ref),
+				0x06 => format!("blez ${}, {}",REGISTER_NAMES[rs],label_ref),
+				0x07 => format!("bgtz ${}, {}",REGISTER_NAMES[rs],label_ref),
+				0x08 => format!("addi ${}, ${}, {}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],imm),
+				0x09 => format!("addiu ${}, ${}, {}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],imm),
+				0x0A => format!("slti ${}, ${}, {}",REGISTER_NAMES[rd],REGISTER_NAMES[rt],imm),
+				0x0B => format!("sltiu ${}, ${}, {}",REGISTER_NAMES[rd],REGISTER_NAMES[rt],imm),
+				0x0C => format!("andi ${}, ${}, {}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],imm),
+				0x0D => format!("ori ${}, ${}, {}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],imm),
+				0x0E => format!("xori ${}, ${}, {}",REGISTER_NAMES[rd],REGISTER_NAMES[rs],imm),
+				0x0F => format!("lui ${}, {}",REGISTER_NAMES[rt],imm),
 				0x10 => {
 					// TODO: This is a horrible way of doing it
 					if funct == 0x18 {
 						format!("eret")
 					} else {
 						if rs == 0 {
-							format!("mfc0 ${}, ${}",rt,rd)
+							format!("mfc0 ${}, ${}",REGISTER_NAMES[rt],REGISTER_NAMES[rd])
 						} else {
-							format!("mtc0 ${}, ${}",rt,rd)
+							format!("mtc0 ${}, ${}",REGISTER_NAMES[rt],REGISTER_NAMES[rd])
 						}
 					}
 				}
@@ -283,9 +307,9 @@ pub fn synthetize(enc: &Vec::<Encoded>, labels: &Vec::<Label>, vram: u64, i: *mu
 
 					// Co-processor instructions
 					if funct == 0 && rs == 0 {
-						return format!("mfcl0 ${}, ${}",rt,rd);
+						return format!("mfcl0 ${}, ${}",REGISTER_NAMES[rt],REGISTER_NAMES[rd]);
 					} else if funct == 0x00 && rs == 0x00 {
-						return format!("mfcl0 ${}, ${}",rt,rd);
+						return format!("mfcl0 ${}, ${}",REGISTER_NAMES[rt],REGISTER_NAMES[rd]);
 					} else if funct == 0x05 && rs == 0x00 {
 						return format!("abs.s $f{}, $f{}",fd,fs);
 					} else if funct == 0x05 && rs == 0x01 {
@@ -303,7 +327,7 @@ pub fn synthetize(enc: &Vec::<Encoded>, labels: &Vec::<Label>, vram: u64, i: *mu
 							0x02 => format!("c.eq.{} {} $f{}, $f{}",subtype-0x10,cc,fs,ft),
 							0x0C => format!("c.lt.{} {} $f{}, $f{}",subtype-0x10,cc,fs,ft),
 							0x0E => format!("c.le.{} {} $f{}, $f{}",subtype-0x10,cc,fs,ft),
-							_ => format!("; unknown"),
+							_ => dword_data(ins,labels),
 						}
 					} else {
 						// TODO: This bugs
@@ -326,35 +350,32 @@ pub fn synthetize(enc: &Vec::<Encoded>, labels: &Vec::<Label>, vram: u64, i: *mu
 									return format!("movf.{} $f{}, $f{}, {}",subtype-0x10,fd,fs,cc);
 								}
 							}
-							0x12 => format!("movz.{} $f{}, $f{}, ${}",subtype-0x10,fd,fs,ft),
-							0x13 => format!("movn.{} $f{}, $f{}, ${}",subtype-0x10,fd,fs,ft),
+							0x12 => format!("movz.{} $f{}, $f{}, ${}",subtype-0x10,fd,fs,REGISTER_NAMES[ft]),
+							0x13 => format!("movn.{} $f{}, $f{}, ${}",subtype-0x10,fd,fs,REGISTER_NAMES[ft]),
 							0x20 => format!("cvt.s.{} $f{}, $f{}",subtype-0x10,fd,fs), // 0x11 = d, 0x14 = w
 							0x21 => format!("cvt.d.{} $f{}, $f{}",subtype-0x10,fd,fs), // 0x10 = s, 0x14 = w
 							0x24 => format!("cvt.w.{} $f{}, $f{}",subtype-0x10,fd,fs),
-							_ => format!("; unknown"),
+							_ => dword_data(ins,labels),
 						}
 					}
 				}
-				0x20 => format!("lb ${}, {}(${})",rt,imm,rs),
-				0x21 => format!("lh ${}, {}(${})",rt,imm,rs),
-				0x22 => format!("lwl ${}, {}(${})",rt,imm,rs),
-				0x23 => format!("lw ${}, {}(${})",rt,imm,rs),
-				0x24 => format!("lbu ${}, {}(${})",rt,imm,rs),
-				0x25 => format!("lhu ${}, {}(${})",rt,imm,rs),
-				0x26 => format!("lwr ${}, {}(${})",rt,imm,rs),
-				0x28 => format!("sb ${}, {}(${})",rt,imm,rs),
-				0x29 => format!("sh ${}, {}(${})",rt,imm,rs),
-				0x2A => format!("swl ${}, {}(${})",rt,imm,rs),
-				0x2B => format!("sw ${}, {}(${})",rt,imm,rs),
-				0x2E => format!("swr ${}, {}(${})",rt,imm,rs),
-				0x30 => format!("ll ${}, {}(${})",rt,imm,rs),
-				0x31 => format!("l/swcl ${}, {}(${})",rt,imm,rs),
-				0x38 => format!("sc ${}, {}(${})",rt,imm,rs),
-				0x3D => format!("sdcl $f{}, {}(${})",rt,imm,rs),
-				_ => {
-					// Invalid
-					format!("dd 0x{:X}",ins.raw_dword)
-				}
+				0x20 => format!("lb ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x21 => format!("lh ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x22 => format!("lwl ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x23 => format!("lw ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x24 => format!("lbu ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x25 => format!("lhu ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x26 => format!("lwr ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x28 => format!("sb ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x29 => format!("sh ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x2A => format!("swl ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x2B => format!("sw ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x2E => format!("swr ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x30 => format!("ll ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x31 => format!("l/swcl ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x38 => format!("sc ${}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				0x3D => format!("sdcl $f{}, {}(${})",REGISTER_NAMES[rt],imm,REGISTER_NAMES[rs]),
+				_ => dword_data(ins,labels),
 			}
 		}
 		Type::Jump => {
@@ -371,18 +392,9 @@ pub fn synthetize(enc: &Vec::<Encoded>, labels: &Vec::<Label>, vram: u64, i: *mu
 			match opcode {
 				0x02 => format!("j {}",label_ref),
 				0x03 => format!("jal {}",label_ref),
-				_ => { "".to_string() }
+				_ => dword_data(ins,labels),
 			}
 		}
-		Type::Invalid => {
-			// Pointing to a label, this simplifies everything
-			let opt_label = labels.iter().find(|&a| a.target == ins.raw_dword as u64);
-			let label_ref: String;
-			if opt_label.is_some() {
-				label_ref = opt_label.unwrap().name.clone();
-				return format!("dd {}",label_ref);
-			}
-			format!("dd 0x{:X}",ins.raw_dword)
-		}
+		Type::Invalid => dword_data(ins,labels),
 	}
 }
