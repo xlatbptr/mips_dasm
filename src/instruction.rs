@@ -153,6 +153,8 @@ pub fn synthetize(enc: &Vec::<Encoded>, labels: &Vec::<Label>, vram: u64, i: *mu
 	let rd = ins.get_rd();
 	let rt = ins.get_rt();
 	let rs = ins.get_rs();
+	let shift = ins.get_shift();
+	let cc = ins.get_coproc();
 	match ins.get_type() {
 		Type::Interrupt => {
 			let code = ins.get_break_code();
@@ -163,9 +165,6 @@ pub fn synthetize(enc: &Vec::<Encoded>, labels: &Vec::<Label>, vram: u64, i: *mu
 		}
 		Type::Register => {
 			// R-Type
-			let shift = ins.get_shift();
-			let cc = ins.get_coproc();
-
 			match funct {
 				0x00 => {
 					if rd == 0 && rt == 0 && shift == 0 {
@@ -178,9 +177,9 @@ pub fn synthetize(enc: &Vec::<Encoded>, labels: &Vec::<Label>, vram: u64, i: *mu
 					let t = ins.get_coproc_movx();
 
 					if t == 0 {
-						format!("movf ${}, ${}, {}",rd,rs,cc)
+						return format!("movf ${}, ${}, {}",rd,rs,cc);
 					} else {
-						format!("movt ${}, ${}, {}",rd,rs,cc)
+						return format!("movt ${}, ${}, {}",rd,rs,cc);
 					}
 				}
 
@@ -265,26 +264,75 @@ pub fn synthetize(enc: &Vec::<Encoded>, labels: &Vec::<Label>, vram: u64, i: *mu
 				0x0E => format!("xori ${}, ${}, {}",rd,rs,imm),
 				0x0F => format!("lui ${}, {}",rt,imm),
 				0x10 => {
-					if rs == 0 {
-						format!("mfc0 ${}, ${}",rt,rd)
+					// TODO: This is a horrible way of doing it
+					if funct == 0x18 {
+						format!("eret")
 					} else {
-						format!("mtc0 ${}, ${}",rt,rd)
+						if rs == 0 {
+							format!("mfc0 ${}, ${}",rt,rd)
+						} else {
+							format!("mtc0 ${}, ${}",rt,rd)
+						}
 					}
 				}
 				0x11 => {
+					let fd = shift;
+					let fs = rd;
+					let ft = rt;
+					let subtype = rs;
+
 					// Co-processor instructions
 					if funct == 0 && rs == 0 {
-						format!("mfcl0 ${}, ${}",rt,rd)
+						return format!("mfcl0 ${}, ${}",rt,rd);
 					} else if funct == 0x00 && rs == 0x00 {
-						format!("mfcl0 ${}, ${}",rt,rd)
-					} else if funct == 0x05 && rs == 0x01 {
-						format!("abs.d $f{}, $f{}",rt,rd)
+						return format!("mfcl0 ${}, ${}",rt,rd);
 					} else if funct == 0x05 && rs == 0x00 {
-						format!("abs.s $f{}, $f{}",rt,rd)
-					} else if funct == 0x00 && rs == 0x11 {
-						format!("abs.d $f{}, $f{}",rt,rd)
+						return format!("abs.s $f{}, $f{}",fd,fs);
+					} else if funct == 0x05 && rs == 0x01 {
+						return format!("abs.d $f{}, $f{}",fd,fs);
+					}
+
+					// Invalid
+					if subtype != 0x10 {
+						return format!("abs.s $f{}, $f{}",rt,rd);
+					}
+
+					let fc = fd & 0x03;
+					if fc == 0xFC {
+						match funct {
+							0x02 => format!("c.eq.{} {} $f{}, $f{}",subtype-0x10,cc,fs,ft),
+							0x0C => format!("c.lt.{} {} $f{}, $f{}",subtype-0x10,cc,fs,ft),
+							0x0E => format!("c.le.{} {} $f{}, $f{}",subtype-0x10,cc,fs,ft),
+							_ => format!("; unknown"),
+						}
 					} else {
-						format!("abs.d $f{}, $f{}",rt,rd)
+						// TODO: This bugs
+						match funct {
+							0x00 => format!("add.{} $f{}, $f{}, $f{}",subtype-0x10,fd,fs,ft),
+							0x01 => format!("sub.{} $f{}, $f{}, ${}",subtype-0x10,fd,fs,ft),
+							0x02 => format!("mul.{} $f{}, $f{}, ${}",subtype-0x10,fd,fs,ft),
+							0x03 => format!("div.{} $f{}, $f{}, $f{}",subtype-0x10,fd,fs,ft),
+							0x04 => format!("sqrt.{} $f{}, $f{}",subtype-0x10,fd,fs),
+							0x06 => format!("mov.{} $f{}, $f{}",subtype-0x10,fd,fs),
+							0x07 => format!("neg.{} $f{}, $f{}",subtype-0x10,fd,fs),
+							0x0C => format!("round.w.{} $f{}, $f{}",subtype-0x10,fd,fs),
+							0x0D => format!("trunc.w.{} $f{}, $f{}",subtype-0x10,fd,fs),
+							0x0E => format!("ceil.w.{} $f{}, $f{}, $f{}",subtype-0x10,fd,fs,ft),
+							0x0F => format!("floor.w.{} $f{}, $f{}",subtype-0x10,fd,fs),
+							0x11 => {
+								if (ins.raw_dword >> 16) & 3 == 1 {
+									return format!("movt.{} $f{}, $f{}, {}",subtype-0x10,fd,fs,cc);
+								} else {
+									return format!("movf.{} $f{}, $f{}, {}",subtype-0x10,fd,fs,cc);
+								}
+							}
+							0x12 => format!("movz.{} $f{}, $f{}, ${}",subtype-0x10,fd,fs,ft),
+							0x13 => format!("movn.{} $f{}, $f{}, ${}",subtype-0x10,fd,fs,ft),
+							0x20 => format!("cvt.s.{} $f{}, $f{}",subtype-0x10,fd,fs), // 0x11 = d, 0x14 = w
+							0x21 => format!("cvt.d.{} $f{}, $f{}",subtype-0x10,fd,fs), // 0x10 = s, 0x14 = w
+							0x24 => format!("cvt.w.{} $f{}, $f{}",subtype-0x10,fd,fs),
+							_ => format!("; unknown"),
+						}
 					}
 				}
 				0x20 => format!("lb ${}, {}(${})",rt,imm,rs),
