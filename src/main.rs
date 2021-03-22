@@ -95,7 +95,8 @@ fn main() -> Result<(),Box<dyn Error>> {
 
 		// Collect labels
 		let pc = (i * size_of::<u32>()) + vram;
-		let label = label::obtain_label(&ins,pc as u64);
+		let vram_limit = vram + read_size;
+		let label = label::obtain_label(&ins,vram as u64,vram_limit as u64,pc as u64);
 		if label.is_some() {
 			let label = label.unwrap();
 
@@ -103,7 +104,6 @@ fn main() -> Result<(),Box<dyn Error>> {
 			if labels.iter().find(|&a| a.target == label.target as u64).is_some() {
 				continue;
 			}
-			//println!("label: {} @ {:#024x}",label.name,label.target);
 			labels.push(label);
 		}
 
@@ -127,10 +127,13 @@ fn main() -> Result<(),Box<dyn Error>> {
 		let label = labels.iter().find(|&a| a.target == pc as u64);
 		if label.is_some() {
 			let label = label.unwrap();
-			output.push_str(&format!("{}:\r\n",label.name));
+
+			let pt_out = format!("{}:\r\n",label.name);
+			output.push_str(&pt_out);
 		}
-		let partial_output = instruction::synthetize(&enc,&labels,vram as u64,&mut i);
-		output.push_str(&format!("/* {:#010X} {:#010X} */\t{}\r\n",pc,enc[i].raw_dword,partial_output));
+		let pt_out = instruction::synthetize(&enc,&labels,vram as u64,&mut i);
+		let pt_out = format!("/* {:#010X} {:#010X} */\t{}\r\n",pc,enc[i].raw_dword,pt_out);
+		output.push_str(&pt_out);
 		i += 1;
 	}
 	enc.clear();

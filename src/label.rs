@@ -20,7 +20,7 @@ impl Label {
 }
 
 use crate::{Encoded,Type};
-pub fn obtain_label(ins: &Encoded, pc: u64) -> Option<Label> {
+pub fn obtain_label(ins: &Encoded, vram: u64, vram_limit: u64, pc: u64) -> Option<Label> {
 	match ins.get_type() {
 		// Relative branches
 		Type::Branching => {
@@ -41,6 +41,12 @@ pub fn obtain_label(ins: &Encoded, pc: u64) -> Option<Label> {
 				_ => None,
 			}
 		}
-		_ => None,
+		_ => {
+			let abs = ins.raw_dword as u64;
+			if abs > vram && abs < vram_limit {
+				return Some(Label::new(format!("ptr_{:X}",abs),abs));
+			}
+			None
+		}
 	}
 }

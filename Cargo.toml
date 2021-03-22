@@ -6,4 +6,15 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[profile.dev]
+panic = "unwind"
+opt-level = 0
+
+[profile.release]
+debug = false
+debug-assertions = false
+lto = "fat"
+panic = "abort"
+opt-level = 3
+
 [dependencies]
