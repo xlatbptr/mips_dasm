@@ -148,22 +148,6 @@ impl Encoded {
 }
 
 use crate::label::Label;
-pub fn obtain_label(ins: &Encoded, pc: u64) -> Option<Label> {
-	match ins.get_type() {
-		// Relative branches
-		Type::Branching => {
-			let abs = ins.get_absolute(pc);
-			return Some(Label::new(format!("l_{:X}",abs),abs));
-		}
-		// Absolute jumps
-		Type::Jump => {
-			let abs = ins.get_offset();
-			return Some(Label::new(format!("func_{:X}",abs),abs));
-		}
-		_ => None,
-	}
-}
-
 static R_NAME: [&str;32] = [
 	"zero",
 	"at",
@@ -176,11 +160,11 @@ static R_NAME: [&str;32] = [
 	"gp",
 	"sp",
 	"fp",
-	"ra"
+	"ra",
 ];
 
 static FL_SIZE: [&str;4] = [
-	"s","d","?","w"
+	"s","d","?","w",
 ];
 
 pub fn dword_data(ins: &Encoded, labels: &Vec::<Label>) -> String {
@@ -299,15 +283,6 @@ pub fn synthetize(enc: &Vec::<Encoded>, labels: &Vec::<Label>, vram: u64, i: *mu
 		Type::Immediate => {
 			let opcode = ins.get_opcode();
 			let imm = ins.get_immediate();
-			let abs = ins.get_absolute(pc);
-
-			let opt_label = labels.iter().find(|&a| a.target == abs as u64);
-			let label_ref: String;
-			if opt_label.is_some() {
-				label_ref = opt_label.unwrap().name.clone();
-			} else {
-				label_ref = format!("{}",imm);
-			}
 			match opcode {
 				0x01 => {
 					match rt {

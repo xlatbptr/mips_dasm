@@ -18,3 +18,29 @@ impl Label {
 		}
 	}
 }
+
+use crate::{Encoded,Type};
+pub fn obtain_label(ins: &Encoded, pc: u64) -> Option<Label> {
+	match ins.get_type() {
+		// Relative branches
+		Type::Branching => {
+			let abs = ins.get_absolute(pc);
+			return Some(Label::new(format!("l_{:X}",abs),abs));
+		}
+		// Absolute jumps
+		Type::Jump => {
+			let abs = ins.get_offset();
+			return Some(Label::new(format!("func_{:X}",abs),abs));
+		}
+		// Lui is also used commonly for labels and stuff
+		Type::Immediate => {
+			let funct = ins.get_funct();
+			let abs = ins.get_absolute(pc);
+			return match funct {
+				0x0F => Some(Label::new(format!("data_{:X}",abs),abs)),
+				_ => None,
+			}
+		}
+		_ => None,
+	}
+}

@@ -94,14 +94,16 @@ fn main() -> Result<(),Box<dyn Error>> {
 		let ins = Encoded::new(ins);
 
 		// Collect labels
-		let pc_off = (i * size_of::<u32>()) + vram;
-		let label = instruction::obtain_label(&ins,pc_off as u64);
+		let pc = (i * size_of::<u32>()) + vram;
+		let label = label::obtain_label(&ins,pc as u64);
 		if label.is_some() {
 			let label = label.unwrap();
-			if labels.iter().find(|&a| a.target == label.target as u64).is_none() {
+
+			// Allow duplicates
+			if labels.iter().find(|&a| a.target == label.target as u64).is_some() {
 				continue;
 			}
-			println!("label: {} @ {:#024x}",label.name,label.target);
+			//println!("label: {} @ {:#024x}",label.name,label.target);
 			labels.push(label);
 		}
 
