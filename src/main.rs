@@ -101,7 +101,7 @@ fn main() -> Result<(),Box<dyn Error>> {
 			if labels.iter().find(|&a| a.target == label.target as u64).is_none() {
 				continue;
 			}
-			println!("; label: {} @ {:#024x}",label.name,label.target);
+			println!("label: {} @ {:#024x}",label.name,label.target);
 			labels.push(label);
 		}
 
