@@ -80,8 +80,9 @@ fn main() -> Result<(),Box<dyn Error>> {
 	let mut enc = Vec::<Encoded>::new();
 	enc.reserve(buffer.len()/size_of::<u32>());
 	let mut labels = Vec::<Label>::new();
-	labels.reserve((buffer.len()/size_of::<u32>())/32);
+	labels.reserve(buffer.len()/size_of::<u32>());
 
+	let vram_limit = vram + read_size;
 	for i in file_offset..(read_size / size_of::<u32>()) {
 		// MIPS is big endian, so we have to read the value and then byte-swap it on
 		// little endian architectures
@@ -95,7 +96,6 @@ fn main() -> Result<(),Box<dyn Error>> {
 
 		// Collect labels
 		let pc = (i * size_of::<u32>()) + vram;
-		let vram_limit = vram + read_size;
 		let label = label::obtain_label(&ins,vram as u64,vram_limit as u64,pc as u64);
 		if label.is_some() {
 			let label = label.unwrap();
@@ -114,14 +114,27 @@ fn main() -> Result<(),Box<dyn Error>> {
 
 	// Give back the OS some memory
 	buffer.clear();
+	labels.shrink_to_fit();
 	enc.shrink_to_fit();
 
 	// Write output to string
 	println!("Sinthetizing into readable assembly");
 	println!("Using {} bytes of memory",size_of::<Encoded>() * enc.len() + size_of::<u8>() * buffer.len() + size_of::<Label>() * labels.len());
 
-	let mut i = 0;
 	let mut output = String::new();
+
+	// First add out-of-reach labels
+	for l in labels.iter() {
+		if !(l.target < vram as u64 || l.target > vram_limit as u64) {
+			continue;
+		}
+
+		// We found an out-of-reach label!
+		output.push_str(&format!(".set {} 0x{:X}",l.name,l.target));
+	}
+
+	// Then print all instructions
+	let mut i = 0;
 	while i < enc.len() {
 		let pc = (i * size_of::<u32>()) + vram;
 		let label = labels.iter().find(|&a| a.target == pc as u64);
