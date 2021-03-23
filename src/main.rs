@@ -122,6 +122,8 @@ fn main() -> Result<(),Box<dyn Error>> {
 	println!("Using {} bytes of memory",size_of::<Encoded>() * enc.len() + size_of::<u8>() * buffer.len() + size_of::<Label>() * labels.len());
 
 	let mut output = String::new();
+	
+	output.push_str(&"; here starts the code\n\r.section .text\n\r");
 
 	// First add out-of-reach labels
 	for l in labels.iter() {
@@ -130,7 +132,7 @@ fn main() -> Result<(),Box<dyn Error>> {
 		}
 
 		// We found an out-of-reach label!
-		output.push_str(&format!(".set {} 0x{:X}",l.name,l.target));
+		output.push_str(&format!(".set {} 0x{:X}\n\r",l.name,l.target));
 	}
 
 	// Then print all instructions
